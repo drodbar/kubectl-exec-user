@@ -33,7 +33,6 @@ read -r -d '' OVERRIDES <<EOF
                 "restartPolicy": "Never",
                 "args": [
                   "exec",
-                  "--rm",
                   "-it",
                   "-u",
                   "${USER}",
