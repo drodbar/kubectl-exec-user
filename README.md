@@ -8,10 +8,9 @@ This works by creating a pod on the same node as the container and mounting the 
 
 ## Install
 
-Run the install script to copy the plugin to `~/.kube/plugins`.
-
+Just clone the plugin within the plugins folder with:
 ```
-./install.sh
+git clone https://github.com/drodbar/kubectl-exec-user.git ~/.kube/plugins/exec-user
 ```
 
 ## Usage
@@ -26,7 +25,7 @@ If the command is not specified, falls back to the `sh` command.
 
 | Name      | Shorthand | Default   | Usage                                                                     |
 |-----------|-----------|---------- |---------------------------------------------------------------------------|
-| user      | -u        | root      | Username or UID.                                                          |
+| remote-user      | -r        | root      | Username or UID.                                                          |
 | container | -c        |           | Container name. If omitted, the first container in the pod will be chosen |
 | name      | -o        | exec-user | Name for new exec-user pod to avoid `pods "exec-user" already exists`     |                           | 
 
@@ -44,10 +43,10 @@ kubectl plugin exec-user example bash
 
 Exec into first container in `example` pod with `bash` as user `admin`.
 ```
-kubectl plugin exec-user -u admin example-pod bash
+kubectl plugin exec-user -r admin example-pod bash
 ```
 
 Exec into `second` container in `example` pod with `bash` as user `admin`.
 ```
-kubectl plugin exec-user -c second -u admin example-pod bash
+kubectl plugin exec-user -c second -r admin example-pod bash
 ```
