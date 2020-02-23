@@ -1,0 +1,123 @@
+#!/bin/bash
+
+function usage() {
+    echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-l|--label=)|(-t|--tolerations=)|(-s|--shell=)|(-h|--help)]"
+}
+
+
+POD=${1}
+USER="root"
+COMMAND="sh"
+NAMESPACE=$(kubectl config view --minify -o 'jsonpath={..namespace}')
+SEL_LABEL="k8s-app"
+
+if [[ $# -lt 1 || $POD == -* ]]; then
+    usage
+    exit 1
+fi
+
+OPTS=`getopt -o u:n:l:s:t:h -l username:namespace:label:shell:tolerations:help -n "kubectl-execuser" -- "${@:2}"`
+
+eval set -- "$OPTS"
+
+while true; do
+  case "$1" in
+    -h | --help ) HELP=true; shift ;;
+    -l | --label ) SEL_LABEL=${2:-$SEL_LABEL}; shift; shift ;;
+    -n | --namespace ) NAMESPACE=${2:-$NAMESPACE}; shift; shift ;;
+    -s | --shell ) COMMAND="${2:-$COMMAND}"; shift; shift ;;
+    -u | --username ) USER=$2; shift; shift ;;
+    -t | --tolerations ) ENABLE_TOLERATIONS=true; shift ;;
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+# Print help
+if [[ $HELP ]]; then
+    usage
+    exit 0
+fi
+
+
+EXECUSER_POD="execuser-${POD}"
+EXECUSER_POD=${EXECUSER_POD:0:63}  # Truncate to 64 char
+
+NODENAME=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template='{{.spec.nodeName}}' )
+APP_LABEL=$(kubectl -n ${NAMESPACE} get pod ${POD} -ojsonpath="{ .metadata.labels.${SEL_LABEL} }")
+DOCKER_CONTAINERID=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template='{{ (index .status.containerStatuses 0).containerID }}' )
+CONTAINERID=${DOCKER_CONTAINERID#*//}
+
+if [[ $ENABLE_TOLERATIONS ]]; then
+read -r -d '' TOLERATIONS <<EOF
+        "tolerations": [
+          {
+               "key": "node-role.kubernetes.io/master"
+          }
+        ],
+EOF
+fi
+
+read -r -d '' CONTAINER_SPEC <<EOF
+{
+    "apiVersion": "v1",
+    "metadata": {
+    "labels": {
+        "k8s-app": "execuser",
+        "run": "execuser-${APP_LABEL}"
+      }
+    },
+    "spec": {
+        "containers": [
+            {
+                "image": "docker",
+                "name": "docker",
+                "stdin": true,
+                "stdinOnce": true,
+                "tty": true,
+                "restartPolicy": "Never",
+                "resources": {
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "50Mi"
+                    },
+                    "requests": {
+                        "cpu": "0",
+                        "memory": "0"
+                    }
+                },
+                "args": [
+                  "exec",
+                  "-it",
+                  "-u",
+                  "${USER}",
+                  "${CONTAINERID}",
+                  "${COMMAND}"
+                ],
+                "volumeMounts": [
+                    {
+                        "mountPath": "/var/run/docker.sock",
+                        "name": "docker"
+                    }
+                ]
+            }
+        ],
+        "nodeSelector": {
+          "kubernetes.io/hostname": "${NODENAME}"
+        },
+        ${TOLERATIONS}
+        "volumes": [
+            {
+                "name": "docker",
+                "hostPath": {
+                    "path": "/var/run/docker.sock",
+                    "type": "File"
+                }
+            }
+        ]
+    }
+}
+EOF
+
+kubectl delete pods -n ${NAMESPACE} -l run="execuser-${APP_LABEL}" --grace-period 0
+kubectl run -n ${NAMESPACE} -it --rm --restart=Never --image=docker --overrides="${CONTAINER_SPEC}" ${EXECUSER_POD}
