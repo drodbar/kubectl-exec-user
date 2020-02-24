@@ -10,7 +10,8 @@ It works by creating a pod on the same node as the container and mounting the do
 
 Just clone the plugin script within a folder in your PATH:
 ```
-wget https://github.com/drodbar/kubectl-execuser/blob/master/kubectl-execuser -o /usr/local/bin/kubectl-execuser
+wget https://raw.githubusercontent.com/drodbar/kubectl-execuser/master/kubectl-execuser -O /usr/local/bin/kubectl-execuser
+chmod +x /usr/local/bin/kubectl-execuser
 ```
 
 ## Usage
