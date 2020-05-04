@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function usage() {
-    echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-l|--label=)|(-t|--tolerations=)|(-s|--shell=)|(-h|--help)]"
+    echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-l|--label=)|(-c|--container-index=)|(-t|--tolerations=)|(-s|--shell=)|(-h|--help)]"
 }
 
 
@@ -10,6 +10,7 @@ USER="root"
 COMMAND="sh"
 NAMESPACE=$(kubectl config view --minify -o 'jsonpath={..namespace}')
 SEL_LABEL="k8s-app"
+CONTAINER_INDEX=0
 
 if [[ $# -lt 1 || $POD == -* ]]; then
     usage
@@ -27,6 +28,7 @@ while true; do
     -n | --namespace ) NAMESPACE=${2:-$NAMESPACE}; shift; shift ;;
     -s | --shell ) COMMAND="${2:-$COMMAND}"; shift; shift ;;
     -u | --username ) USER=$2; shift; shift ;;
+    -c | --container-index ) CONTAINER_INDEX={$2:-${CONTAINER_INDEX}}; shift; shift ;;
     -t | --tolerations ) ENABLE_TOLERATIONS=true; shift ;;
     -- ) shift; break ;;
     * ) break ;;
@@ -45,7 +47,7 @@ EXECUSER_POD=${EXECUSER_POD:0:63}  # Truncate to 64 char
 
 NODENAME=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template='{{.spec.nodeName}}' )
 APP_LABEL=$(kubectl -n ${NAMESPACE} get pod ${POD} -ojsonpath="{ .metadata.labels.${SEL_LABEL} }")
-DOCKER_CONTAINERID=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template='{{ (index .status.containerStatuses 0).containerID }}' )
+DOCKER_CONTAINERID=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template="{{ (index .status.containerStatuses ${CONTAINER_INDEX}).containerID }}" )
 CONTAINERID=${DOCKER_CONTAINERID#*//}
 
 if [[ $ENABLE_TOLERATIONS ]]; then
