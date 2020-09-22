@@ -1,9 +1,8 @@
 #!/bin/bash
 
 function usage() {
-    echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-l|--label=)|(-c|--container-index=)|(-t|--tolerations=)|(-s|--shell=)|(-h|--help)]"
+    echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-l|--label=)|(-c|--container-index=)|(-t|--tolerations=)|(-s|--shell=)|(-v|--verbose)|(-h|--help)]"
 }
-
 
 POD=${1}
 USER="root"
@@ -11,13 +10,19 @@ COMMAND="sh"
 NAMESPACE=$(kubectl config view --minify -o 'jsonpath={..namespace}')
 SEL_LABEL="k8s-app"
 CONTAINER_INDEX=0
+VERBOSE=false
 
 if [[ $# -lt 1 || $POD == -* ]]; then
     usage
     exit 1
 fi
 
-OPTS=`getopt -o u:n:l:s:t:h -l username:namespace:label:shell:tolerations:help -n "kubectl-execuser" -- "${@:2}"`
+OPTS=`getopt -o u:n:l:s:c:htv -l "username:namespace:label:shell:index:help,tolerations,verbose," -n "kubectl-execuser" -- "${@:2}"`
+
+[ $? -eq 0 ] || {
+    usage
+    exit 1
+}
 
 eval set -- "$OPTS"
 
@@ -28,30 +33,42 @@ while true; do
     -n | --namespace ) NAMESPACE=${2:-$NAMESPACE}; shift; shift ;;
     -s | --shell ) COMMAND="${2:-$COMMAND}"; shift; shift ;;
     -u | --username ) USER=$2; shift; shift ;;
-    -c | --container-index ) CONTAINER_INDEX={$2:-${CONTAINER_INDEX}}; shift; shift ;;
+    -c | --container-index ) CONTAINER_INDEX_ARG=true; CONTAINER_INDEX=${2:-${CONTAINER_INDEX}}; shift; shift ;;
     -t | --tolerations ) ENABLE_TOLERATIONS=true; shift ;;
+    -v | --verbose ) VERBOSE=true; shift ;;
     -- ) shift; break ;;
     * ) break ;;
   esac
 done
 
 # Print help
-if [[ $HELP ]]; then
+if ${HELP:-false} ; then
     usage
     exit 0
 fi
 
+if ${VERBOSE:-false} ; then
+  set -x
+fi
+
+CONTAINERS="$(kubectl get po -n $NAMESPACE $POD -o "jsonpath={range .status.containerStatuses[*]}{.name}{'\n'}{end}")"
+NUM_CONTAINERS=$(echo "$CONTAINERS" | wc -l)
+
+if [[ "$NUM_CONTAINERS" -gt 1 && ! "$CONTAINER_INDEX_ARG" = true ]]; then
+  echo "Container index arg missing. Defaulting to index 0."
+  echo "Consider passing argument (-c|--container-index) to exec into a different container"
+  echo "$CONTAINERS" | awk 'BEGIN{line=0}{printf "\t%d) %s\n", line++, $0}'
+fi
 
 EXECUSER_POD="execuser-${POD}"
 EXECUSER_POD=${EXECUSER_POD:0:63}  # Truncate to 64 char
 
 NODENAME=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template='{{.spec.nodeName}}' )
-APP_LABEL=$(kubectl -n ${NAMESPACE} get pod ${POD} -ojsonpath="{ .metadata.labels.${SEL_LABEL} }")
 DOCKER_CONTAINERID=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template="{{ (index .status.containerStatuses ${CONTAINER_INDEX}).containerID }}" )
 CONTAINERID=${DOCKER_CONTAINERID#*//}
 
 if [[ $ENABLE_TOLERATIONS ]]; then
-read -r -d '' TOLERATIONS <<EOF
+read -r -d '' TOLERATIONS << EOF
         "tolerations": [
           {
                "key": "node-role.kubernetes.io/master"
@@ -60,13 +77,13 @@ read -r -d '' TOLERATIONS <<EOF
 EOF
 fi
 
-read -r -d '' CONTAINER_SPEC <<EOF
+read -r -d '' CONTAINER_SPEC << EOF
 {
     "apiVersion": "v1",
     "metadata": {
     "labels": {
         "k8s-app": "execuser",
-        "run": "execuser-${APP_LABEL}"
+        "run": "${EXECUSER_POD}"
       }
     },
     "spec": {
@@ -121,5 +138,5 @@ read -r -d '' CONTAINER_SPEC <<EOF
 }
 EOF
 
-kubectl delete pods -n ${NAMESPACE} -l run="execuser-${APP_LABEL}" --grace-period 0
+kubectl delete pods -n ${NAMESPACE} -l run="${EXECUSER_POD}" --grace-period 0 &>/dev/null
 kubectl run -n ${NAMESPACE} -it --rm --restart=Never --image=docker --overrides="${CONTAINER_SPEC}" ${EXECUSER_POD}
