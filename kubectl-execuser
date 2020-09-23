@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 function usage() {
     echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-l|--label=)|(-c|--container-index=)|(-t|--tolerations=)|(-s|--shell=)|(-v|--verbose)|(-h|--help)]"
@@ -42,12 +42,12 @@ while true; do
 done
 
 # Print help
-if ${HELP:-false} ; then
+if [[ "${HELP:-false}" = true ]] ; then
     usage
     exit 0
 fi
 
-if ${VERBOSE:-false} ; then
+if [[ "${VERBOSE:-false}" = true ]] ; then
   set -x
 fi
 
