@@ -42,19 +42,19 @@ while true; do
 done
 
 # Print help
-if [[ "${HELP:-false}" = true ]] ; then
+if [ "${HELP:-false}" = true ] ; then
     usage
     exit 0
 fi
 
-if [[ "${VERBOSE:-false}" = true ]] ; then
+if [ "${VERBOSE:-false}" = true ] ; then
   set -x
 fi
 
 CONTAINERS="$(kubectl get po -n $NAMESPACE $POD -o "jsonpath={range .status.containerStatuses[*]}{.name}{'\n'}{end}")"
 NUM_CONTAINERS=$(echo "$CONTAINERS" | wc -l)
 
-if [[ "$NUM_CONTAINERS" -gt 1 && ! "$CONTAINER_INDEX_ARG" = true ]]; then
+if [ "$NUM_CONTAINERS" -gt 1 ] && [ "$CONTAINER_INDEX_ARG" != true ]; then
   echo "Container index arg missing. Defaulting to index 0."
   echo "Consider passing argument (-c|--container-index) to exec into a different container"
   echo "$CONTAINERS" | awk 'BEGIN{line=0}{printf "\t%d) %s\n", line++, $0}'
@@ -67,7 +67,7 @@ NODENAME=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template='{{.spec.nodeN
 DOCKER_CONTAINERID=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template="{{ (index .status.containerStatuses ${CONTAINER_INDEX}).containerID }}" )
 CONTAINERID=${DOCKER_CONTAINERID#*//}
 
-if [[ $ENABLE_TOLERATIONS ]]; then
+if [ "$ENABLE_TOLERATIONS" = true ]; then
 read -r -d '' TOLERATIONS << EOF
         "tolerations": [
           {
