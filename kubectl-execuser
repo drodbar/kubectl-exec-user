@@ -79,16 +79,16 @@ CONTAINER_ID=${DOCKER_CONTAINER_ID#*//}
 
 if [ "$ENABLE_TOLERATIONS" = true ]; then
 
-(read -r -d '' TOLERATIONS << EOM
+TOLERATIONS=$(cat <<EOM
         "tolerations": [
           { "key": "node-role.kubernetes.io/master" }
         ],
 EOM
-) || true
+)
 
 fi
 
-(read -r -d '' CONTAINER_SPEC << EOM
+CONTAINER_SPEC=$(cat <<EOM
 {
     "apiVersion": "v1",
     "metadata": {
@@ -148,7 +148,7 @@ fi
     }
 }
 EOM
-) || true
+)
 
 kubectl delete pods -n ${NAMESPACE} -l run="${EXECUSER_POD}" --grace-period 0 &>/dev/null
 kubectl run -n ${NAMESPACE} -it --rm --restart=Never --image=docker --overrides="${CONTAINER_SPEC}" ${EXECUSER_POD}
