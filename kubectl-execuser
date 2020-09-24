@@ -3,7 +3,7 @@
 set -e
 
 function usage() {
-  echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-c|--container-index=)|(-s|--shell=)|(-t|--tolerations)|(-d|--debug-only)|(-v|--verbose)|(-h|--help)]"
+  echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-c|--container-index=)|(-s|--shell=)|(-t|--tolerations)|(-d|--debug)|(-v|--verbose)|(-h|--help)]"
 }
 
 VARS1=$(set -o posix ; set);
@@ -32,7 +32,7 @@ eval set -- "$OPTS"
 
 while true; do
   case "$1" in
-    -d | --debug-only ) DEBUG=true; shift ;;
+    -d | --debug ) DEBUG=true; shift ;;
     -h | --help ) HELP=true; shift ;;
     -n | --namespace ) NAMESPACE=${2:-$NAMESPACE}; shift; shift ;;
     -s | --shell ) COMMAND="${2:-$COMMAND}"; shift; shift ;;
@@ -47,7 +47,6 @@ done
 
 if [ "$DEBUG" = true ] ; then
     diff <(echo "$VARS1") <(unset VARS1; set +e; set -o posix; set) | grep '^> ' |  sed 's_> __g'
-    exit 0
 fi
 
 # Print help
