@@ -5,13 +5,14 @@ set -e
 function usage() {
   echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-c|--container-index=)|(-s|--shell=)|(-t|--tolerations)|(-d|--debug-only)|(-v|--verbose)|(-h|--help)]"
 }
-VARS="`set -o posix ; set`";
+
+VARS1=$(set -o posix ; set);
 ARGS="${@}"
 POD=${1}
 POD_USER="root"
 COMMAND="sh"
-CURRENT_NAMESPACE=$(kubectl config view --minify -o 'jsonpath={..namespace}')
-NAMESPACE="${CURRENT_NAMESPACE:-default}"
+NAMESPACE=$(kubectl config view --minify -o 'jsonpath={..namespace}')
+NAMESPACE="${NAMESPACE:-default}"
 CONTAINER_INDEX=0
 VERBOSE=false
 
@@ -45,9 +46,7 @@ while true; do
 done
 
 if [ "$DEBUG" = true ] ; then
-    echo "$VARS"
-    SCRIPT_VARS="`grep -vFe "$VARS" <<<"$(set -o posix ; set)" | grep -v ^VARS=`";
-    echo "$SCRIPT_VARS"
+    diff <(echo "$VARS1") <(unset VARS1; set +e; set -o posix; set) | grep '^> ' |  sed 's_> __g'
     exit 0
 fi
 
