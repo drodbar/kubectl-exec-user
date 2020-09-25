@@ -2,10 +2,25 @@
 
 set -e -o pipefail
 
+HELP_MSG=$(cat <<EOM
+kubectl execuser [options] <podname>
+
+  Options:
+    -u|--username <user>                     : user in the pod
+    -n|--namespace <namespace>               : namespace containig the pod
+    -c|--container-index <container-index>   : index of the container within the pod
+    -s|--shell <shell>                       : shell to exec into in the pod
+    -d|--debug                               : debug mode shows the variables in the plugin
+    -v|--verbose                             : verbose mode
+    -h|--help                                : show this help menu
+EOM
+)
+
+
 function usage() {
   EXIT_VAL="$?"
   if [ "$EXIT_VAL" -ne 0 ] && [ "$EXIT_VAL" -ne 130 ] && [ "$EXIT_VAL" -ne 1 ] || [ "$HELP" = true ] ; then
-    echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-c|--container-index=)|(-s|--shell=)|(-d|--debug)|(-v|--verbose)|(-h|--help)]"
+    echo "$HELP_MSG"
   fi
 }
 
