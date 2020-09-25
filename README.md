@@ -2,7 +2,7 @@
 
 ## Overview
 
-Exec as a specified user into a Kubernetes container. It has been tested on a kubernetes cluster v1.14.0.
+Exec as a specified user into a Kubernetes container. It has been tested on a kubernetes cluster versions v1.14.x and 1.16.10
 
 It works by creating a pod on the same node as the container and mounting the docker socket into this container. The container runs the docker application which has access to the hosts containers and is able to use the exec command with the user flag.
 
@@ -14,21 +14,31 @@ wget https://raw.githubusercontent.com/drodbar/kubectl-execuser/master/kubectl-e
 chmod +x /usr/local/bin/kubectl-execuser
 ```
 
+To check correct installation run:
+```
+kubectl plugin list
+```
+if the binary path appears in the output, you are ready to go!
+
 ## Usage
 
 ```
-kubectl execuser $POD $COMMAND
+kubectl execuser [(-n|--namespace) $NAMESPACE][(-s|--shell) $SHELL][-c|--container-index $CONT_IDX][(-u|--username)] [(-h|--help)][(-v|--verbose)][(-d|--debug)]  $POD
 ```
 
-If the command is not specified, falls back to the `sh` command.
+The pod name is the only mandatory argument, and it can be placed anywhere.
 
 **Flags**
 
-| Name      | Shorthand | Default   | Usage                                                                     |
-|-----------|-----------|---------- |---------------------------------------------------------------------------|
-| remote-user      | -r        | root      | Username or UID.                                                          |
-| container | -c        |           | Container name. If omitted, the first container in the pod will be chosen |
-| name      | -o        | execuser | Name for new execuser pod to avoid `pods "execuser" already exists`     |                           | 
+| Name      | shortopt | longopt     | Default   | Usage                                                         |
+|-----------|-----------|------------|---------------------------------------------------------------------------|
+| username  | -u        | --username | root      | Username or UID                                              |
+| namespace  | -n        | --namespace | $current\_namespace\|default | Namespace. It will default to current, if any, or 'default' |
+| container-index | -c  | --container-index | 0  | Container index                                            |
+| shell  | -s        | --shell | sh      | Shell to run                                              |
+| debug | -d  | --debug |   | Debug mode                                              |
+| verbose | -v  | --verbose |   | Verbose mode                                              |
+| help | -h  | --help |   | Show help                                              |
 
 ## Examples
 
@@ -37,17 +47,17 @@ Exec into first container in `example` pod with `sh` as user `root`.
 kubectl execuser example
 ```
 
-Exec into first container in `example` pod with `bash` as user `root`.
+Exec into first container in `example` pod with a `bash` shell as user `root`.
 ```
-kubectl execuser example bash
+kubectl execuser example -s bash
 ```
 
 Exec into first container in `example` pod with `bash` as user `admin`.
 ```
-kubectl execuser -r admin example-pod bash
+kubectl execuser -u admin example-pod -s bash
 ```
 
-Exec into `second` container in `example` pod with `bash` as user `admin`.
+Exec into `` container in `example` pod with a `bash` shell and user `admin`.
 ```
-kubectl execuser -c second -r admin example-pod bash
+kubectl execuser -c 1 -u admin example-pod -s bash
 ```

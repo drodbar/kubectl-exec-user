@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 
-set -e
+set -e -o pipefail
 
 function usage() {
-  echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-c|--container-index=)|(-s|--shell=)|(-t|--tolerations)|(-d|--debug)|(-v|--verbose)|(-h|--help)]"
+  EXIT_VAL="$?"
+  if [ "$EXIT_VAL" -ne 0 ] && [ "$EXIT_VAL" -ne 130 ] && [ "$EXIT_VAL" -ne 1 ] || [ "$HELP" = true ] ; then
+    echo "kubectl execuser pod [(-u|--username=)|(-n|--namespace=)|(-c|--container-index=)|(-s|--shell=)|(-d|--debug)|(-v|--verbose)|(-h|--help)]"
+  fi
 }
 
-VARS1=$(set -o posix ; set);
-ARGS="${@}"
-POD=${1}
+trap usage EXIT
+
+SHORTOPTS="u:n:s:c:dhv"
+LONGOPTS="username:namespace:shell:index:debug,help,verbose,"
+
+OPTS=$(getopt -o $SHORTOPTS -l $LONGOPTS -n "$0" -- "${@}")
+eval set -- "$OPTS"
+
+VARS=$(set -o posix ; set);
+
 POD_USER="root"
 COMMAND="sh"
 NAMESPACE=$(kubectl config view --minify -o 'jsonpath={..namespace}')
@@ -16,84 +26,61 @@ NAMESPACE="${NAMESPACE:-default}"
 CONTAINER_INDEX=0
 VERBOSE=false
 
-if [ $# -lt 1 ] || [ -z "$POD" ] ; then
-    usage
-    exit 1
-fi
-
-OPTS=`getopt -o u:n:s:c:dhtv -l "username:namespace:shell:index:debug,help,tolerations,verbose," -n "kubectl-execuser" -- "${@:2}"`
-
-if [ $? -ne 0 ] ; then
-    usage
-    exit 1
-fi
-
-eval set -- "$OPTS"
-
 while true; do
   case "$1" in
     -d | --debug ) DEBUG=true; shift ;;
     -h | --help ) HELP=true; shift ;;
-    -n | --namespace ) NAMESPACE=${2:-$NAMESPACE}; shift; shift ;;
-    -s | --shell ) COMMAND="${2:-$COMMAND}"; shift; shift ;;
-    -u | --username ) POD_USER=$2; shift; shift ;;
-    -c | --container-index ) CONTAINER_INDEX_ARG=true; CONTAINER_INDEX=${2:-${CONTAINER_INDEX}}; shift; shift ;;
-    -t | --tolerations ) ENABLE_TOLERATIONS=true; shift ;;
+    -n | --namespace ) NAMESPACE=${2:-$NAMESPACE}; shift 2 ;;
+    -s | --shell ) COMMAND="${2:-$COMMAND}"; shift 2 ;;
+    -u | --username ) POD_USER=$2; shift 2 ;;
+    -c | --container-index ) CONTAINER_INDEX_ARG=true; CONTAINER_INDEX=${2:-${CONTAINER_INDEX}}; shift 2 ;;
     -v | --verbose ) VERBOSE=true; shift ;;
     -- ) shift; break ;;
     * ) break ;;
   esac
 done
 
-if [ "$DEBUG" = true ] ; then
-    diff <(echo "$VARS1") <(unset VARS1; set +e; set -o posix; set) | grep '^> ' |  sed 's_> __g'
-fi
+POD_NAME=$1
 
-# Print help
-if [ "${HELP:-false}" = true ] ; then
-    usage
-    exit 0
-fi
+[ "$DEBUG" = true ] &&
+  grep -vFe "$VARS" <<<$(unset VARS; set +e; set -o posix; set)
 
-if [ "${VERBOSE:-false}" = true ] ; then
+[ "${HELP:-false}" = true ] &&
+  exit 0
+
+[ "${VERBOSE:-false}" = true ] &&
   set -x
-fi
 
-CONTAINERS="$(kubectl get po -n $NAMESPACE $POD -o "jsonpath={range .status.containerStatuses[*]}{.name}{'\n'}{end}")"
+[ -z "$POD_NAME" ] &&
+  echo -e "[\e[91mERROR\e[0m] Podname missing!" &&
+  exit 1
+
+CONTAINERS="$(kubectl get pod -n $NAMESPACE $POD_NAME -o "jsonpath={range .status.containerStatuses[*]}{.name}{'\n'}{end}")"
 NUM_CONTAINERS=$(echo "$CONTAINERS" | wc -l)
 
 if [ "$NUM_CONTAINERS" -gt 1 ] && [ "$CONTAINER_INDEX_ARG" != true ]; then
-  echo "Container index arg missing. Defaulting to index 0,"
-  echo "consider passing the opt argument (-c|--container-index) to specify a different container"
-  echo "$CONTAINERS" | awk 'BEGIN{line=0}{printf "\t%d) %s\n", line++, $0}'
+    echo -e "[\e[93mWARN\e[0m] Container index argument missing (-c|--container-index). Default container index [0]"
+    echo "$CONTAINERS" | awk 'BEGIN{line=0}{printf "\t%d) %s\n", line++, $0}'
 fi
 
-EXECUSER_POD="execuser-${POD}"
+EXECUSER_POD="execuser-${POD_NAME}"
 EXECUSER_POD=${EXECUSER_POD:0:63}  # Truncate to 64 char
 
-NODENAME=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template='{{.spec.nodeName}}' )
-DOCKER_CONTAINER_ID=$( kubectl -n ${NAMESPACE} get pod ${POD} -o go-template="{{ (index .status.containerStatuses ${CONTAINER_INDEX}).containerID }}" )
+NODENAME=$( kubectl get pod -n ${NAMESPACE} ${POD_NAME} -o go-template='{{.spec.nodeName}}' )
+DOCKER_CONTAINER_ID=$( kubectl get pod -n ${NAMESPACE} ${POD_NAME} -o go-template="{{ (index .status.containerStatuses ${CONTAINER_INDEX}).containerID }}" )
 CONTAINER_ID=${DOCKER_CONTAINER_ID#*//}
 
-if [ "$ENABLE_TOLERATIONS" = true ]; then
-
-TOLERATIONS=$(cat <<EOM
-        "tolerations": [
-          { "key": "node-role.kubernetes.io/master" }
-        ],
-EOM
-)
-
+if [[ "$NODENAME" == *"master"* ]]; then
+  MASTER_TOLERATIONS="\"tolerations\": [{ \"key\": \"node-role.kubernetes.io/master\" }],"
 fi
 
 CONTAINER_SPEC=$(cat <<EOM
 {
     "apiVersion": "v1",
     "metadata": {
-    "labels": {
-        "k8s-app": "execuser",
-        "run": "${EXECUSER_POD}"
-      }
+        "labels": {
+            "k8s-app": "${EXECUSER_POD}"
+        }
     },
     "spec": {
         "containers": [
@@ -133,7 +120,7 @@ CONTAINER_SPEC=$(cat <<EOM
         "nodeSelector": {
           "kubernetes.io/hostname": "${NODENAME}"
         },
-        ${TOLERATIONS}
+        ${MASTER_TOLERATIONS}
         "volumes": [
             {
                 "name": "docker",
@@ -148,5 +135,5 @@ CONTAINER_SPEC=$(cat <<EOM
 EOM
 )
 
-kubectl delete pods -n ${NAMESPACE} -l run="${EXECUSER_POD}" --grace-period 0 &>/dev/null
+kubectl delete pods -n ${NAMESPACE} -l k8s-app="${EXECUSER_POD}" --grace-period 0 &>/dev/null
 kubectl run -n ${NAMESPACE} -it --rm --restart=Never --image=docker --overrides="${CONTAINER_SPEC}" ${EXECUSER_POD}
