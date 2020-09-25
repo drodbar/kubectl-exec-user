@@ -26,28 +26,30 @@ if the binary path appears in the output, you are ready to go!
 kubectl execuser [options] <podname>
 
   Options:
-    -u|--username <user>                     : user in the pod
-    -n|--namespace <namespace>               : namespace containig the pod
-    -c|--container-index <container-index>   : index of the container within the pod
-    -s|--shell <shell>                       : shell to exec into in the pod
-    -d|--debug                               : debug mode shows the variables in the plugin
-    -v|--verbose                             : verbose mode
-    -h|--help                                : show this help menu
+    -u|--username  <user>        : user in the pod
+    -n|--namespace <namespace>   : namespace containig the pod
+    -c|--container <container>   : container within the pod
+    -i|--index <index>           : index of the container within the pod
+    -s|--shell <shell>           : shell to exec into in the pod
+    -d|--debug                   : debug mode shows the variables in the plugin
+    -v|--verbose                 : verbose mode
+    -h|--help                    : show this help menu
 ```
 
 The pod name is the only mandatory argument, and it can be placed anywhere.
 
 **Flags**
 
-| Name            | shortopt  | longopt           | Default  | Usage                                                         |
-|-----------------|-----------|-------------------|----------|---------------------------------------------------------------|
-| username        | -u        | --username        | root     | Username or UID                                               |
-| namespace       | -n        | --namespace       | default  | Namespace. It will default to current, if any, or 'default'   |
-| container-index | -c        | --container-index | 0        | Container index                                               |
-| shell           | -s        | --shell           | sh       | Shell to run                                                  |
-| debug           | -d        | --debug           | .        | Debug mode                                                    |
-| verbose         | -v        | --verbose         | .        | Verbose mode                                                  |
-| help            | -h        | --help            | .        | Show help                                                     |
+| Name      | shortopt  | longopt           | Default  | Usage                                         |
+|:----------|:---------:|:------------------|:--------:|:----------------------------------------------|
+| username  | -u        | --username        | root     | Username or UID                               |
+| namespace | -n        | --namespace       | default  | Namespace:  defaults to current or 'default'  |
+| container | -c        | --container       |          | Container name                                |
+| index     | -i        | --index           | 0        | Container index                               |
+| shell     | -s        | --shell           | sh       | Shell to run                                  |
+| debug     | -d        | --debug           |          | Debug mode                                    |
+| verbose   | -v        | --verbose         |          | Verbose mode                                  |
+| help      | -h        | --help            |          | Show help                                     |
 
 ## Examples
 
@@ -66,7 +68,13 @@ Exec into first container in `example` pod with `bash` as user `admin`.
 kubectl execuser -u admin example -s bash
 ```
 
-Exec into container `1` within pod `example` pod with a `bash` shell and user `admin`.
+Exec into container `1` within pod `example` pod with a `bash` shell and user `admin`, allowing `debug` and `verbose` mode.
 ```bash
-kubectl execuser -c 1 -u admin example -s bash
+kubectl execuser -c 1 -u admin example -s bash -dv
+```
+
+Exec into container `container` within pod `example` allowing `debug` mode.
+```bash
+# defaults to root user and sh shell
+kubectl execuser -c container example -d
 ```
