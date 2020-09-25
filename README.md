@@ -30,15 +30,15 @@ The pod name is the only mandatory argument, and it can be placed anywhere.
 
 **Flags**
 
-| Name      | shortopt | longopt     | Default   | Usage                                                         |
-|-----------|-----------|------------|---------------------------------------------------------------------------|
-| username  | -u        | --username | root      | Username or UID                                              |
-| namespace  | -n        | --namespace | $current\_namespace\|default | Namespace. It will default to current, if any, or 'default' |
-| container-index | -c  | --container-index | 0  | Container index                                            |
-| shell  | -s        | --shell | sh      | Shell to run                                              |
-| debug | -d  | --debug |   | Debug mode                                              |
-| verbose | -v  | --verbose |   | Verbose mode                                              |
-| help | -h  | --help |   | Show help                                              |
+| Name            | shortopt  | longopt           | Default  | Usage                                                         |
+|-----------------|-----------|-------------------|----------|---------------------------------------------------------------|
+| username        | -u        | --username        | root     | Username or UID                                               |
+| namespace       | -n        | --namespace       | default  | Namespace. It will default to current, if any, or 'default'   |
+| container-index | -c        | --container-index | 0        | Container index                                               |
+| shell           | -s        | --shell           | sh       | Shell to run                                                  |
+| debug           | -d        | --debug           | .        | Debug mode                                                    |
+| verbose         | -v        | --verbose         | .        | Verbose mode                                                  |
+| help            | -h        | --help            | .        | Show help                                                     |
 
 ## Examples
 
