@@ -2,6 +2,7 @@
 
 set -e -o pipefail
 
+trap usage EXIT
 
 function usage() {
   EXIT_VAL="$?"
@@ -24,8 +25,10 @@ EOM
   fi
 }
 
-trap usage EXIT
-
+ERROR='\033[91m'
+DEBUG='\033[95m'
+INFO='\033[94m'
+CLEAR='\033[0m'
 SHORTOPTS="u:n:s:c:i:dhv"
 LONGOPTS="username:namespace:shell:container:index:debug,help,verbose,"
 
@@ -48,7 +51,7 @@ while true; do
     -s | --shell ) COMMAND="${2:-$COMMAND}"; shift 2 ;;
     -i | --index ) CONTAINER_INDEX=$2; shift 2 ;;
     -c | --container ) CONTAINER=$2; shift 2 ;;
-    -d | --debug ) DEBUG=true; shift ;;
+    -d | --debug ) DEBUG_MODE=true; shift ;;
     -v | --verbose ) VERBOSE=true; shift ;;
     -h | --help ) HELP=true; shift ;;
     -- ) shift; break ;;
@@ -58,8 +61,12 @@ done
 
 POD_NAME=$1
 
-[ "$DEBUG" = true ] &&
-  grep -vFe "$VARS" <<<$(unset VARS HELP_MSG; set +e; set -o posix; set) | awk -e '{print "[\033[94mINFO\033[0m]", $0}'
+[ "$DEBUG_MODE" = true ] &&
+  grep -vFe "$VARS" <<<$(unset VARS HELP_MSG SHLVL; set +e; set -o posix; set) \
+    | while read VAR; do
+        echo -e "[${DEBUG}DEBUG${CLEAR}] $VAR"
+      done \
+    && echo
 
 [ "${HELP:-false}" = true ] &&
   exit 0
@@ -68,17 +75,19 @@ POD_NAME=$1
   set -x
 
 [ -z "$POD_NAME" ] &&
-  echo -e "[\e[91mERROR\e[0m] Podname missing!" &&
+  echo -e "[${ERROR}ERROR${CLEAR}] Podname missing!" &&
   exit 1
 
 POD_JSON="$(kubectl get pod -n $NAMESPACE $POD_NAME -o json)"
 CONTAINERS="$(echo "$POD_JSON" | jq -r '.status.containerStatuses[].name')"
 NUM_CONTAINERS=$(echo "$CONTAINERS" | wc -l)
 
-if   [ "$NUM_CONTAINERS" -gt 1 ] && [ -z "$CONTAINER_INDEX" ] && [ -z "$CONTAINER" ] \
-  || [ "$DEBUG" = true ]; then
-    echo -e "[\e[94mINFO\e[0m] Check help for container selection. Default container index 0."
+DEFAULT_CONTAINER="$([ "$NUM_CONTAINERS" -gt 1 ] && [ -z "$CONTAINER_INDEX" ] && [ -z "$CONTAINER" ] && echo true || echo "")"
+
+if [ -z "$DEFAULT_CONTAINER" ] || [ "$DEBUG_MODE" = true ]; then
+    echo -e "[${INFO}INFO${CLEAR}] Check help for container selection. Default container index 0."
     echo "$CONTAINERS" | awk '{printf "%8d) %s\n", line++, $0}'
+    echo
 fi
 
 EXECUSER_POD="execuser-${POD_NAME}"
