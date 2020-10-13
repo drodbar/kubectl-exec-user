@@ -62,8 +62,8 @@ done
 POD_NAME=$1
 
 [ "$DEBUG_MODE" = true ] &&
-  grep -vFe "$VARS" <<<$(unset VARS HELP_MSG SHLVL; set +e; set -o posix; set) \
-    | while read VAR; do
+  grep -vFe "$VARS" <<<"$(unset VARS HELP_MSG SHLVL; set +e; set -o posix; set)" \
+    | while read -r VAR; do
         echo -e "[${DEBUG}DEBUG${CLEAR}] $VAR"
       done \
     && echo
@@ -78,7 +78,7 @@ POD_NAME=$1
   echo -e "[${ERROR}ERROR${CLEAR}] Podname missing!" &&
   exit 1
 
-POD_JSON="$(kubectl get pod -n $NAMESPACE $POD_NAME -o json)"
+POD_JSON="$(kubectl get pod -n "$NAMESPACE" "$POD_NAME" -o json)"
 CONTAINERS="$(echo "$POD_JSON" | jq -r '.status.containerStatuses[].name')"
 NUM_CONTAINERS=$(echo "$CONTAINERS" | wc -l)
 
@@ -166,5 +166,5 @@ CONTAINER_SPEC=$(cat <<EOM
 EOM
 )
 
-kubectl delete pods -n ${NAMESPACE} -l k8s-app="${EXECUSER_POD}" --grace-period 0 &>/dev/null
-kubectl run -n ${NAMESPACE} -it --rm --restart=Never --image=docker --overrides="${CONTAINER_SPEC}" ${EXECUSER_POD}
+kubectl delete pods -n "${NAMESPACE}" -l k8s-app="${EXECUSER_POD}" --grace-period 0 &>/dev/null
+kubectl run -n "${NAMESPACE}" -it --rm --restart=Never --image=docker --overrides="${CONTAINER_SPEC}" "${EXECUSER_POD}"
